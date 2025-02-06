@@ -2,7 +2,7 @@ import sys
 import pandas as pd
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QTableWidget, QTableWidgetItem,
                              QVBoxLayout, QWidget, QPushButton, QHBoxLayout, QLineEdit, QDialog,
-                             QFormLayout, QDialogButtonBox, QGraphicsDropShadowEffect, QMessageBox)
+                             QFormLayout, QDialogButtonBox, QMessageBox)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 import csv
@@ -203,24 +203,28 @@ class LibraryApp(QMainWindow):
                 delete_button.clicked.connect(lambda _, r=row: self.delete_row(r))
                 self.table.setCellWidget(row, df_to_display.shape[1], delete_button)
 
-    def save_to_csv(self):
-        self.df.to_csv(self.csv_file, index=False)
+
     def save_data(self):
         #self.df.to_csv(self.file_path, index=False)
         self.df.to_csv(self.file_path, index=False, quoting=csv.QUOTE_ALL)
 
     def search_data(self):
         search_text = self.search_input.text().lower()
+
         if search_text == "":
             self.df = self.original_df.copy()  # Przywracamy pełne dane
-            self.refresh_table()
         else:
             # Filtrowanie wierszy, które zawierają szukany tekst w którejkolwiek z kolumn
             filtered_df = self.original_df[
-                self.original_df.apply(lambda row: row.astype(str).str.contains(search_text, case=False).any(), axis=1)]
+                self.original_df.apply(lambda row: row.astype(str).str.contains(search_text, case=False).any(), axis=1)
+            ]
 
-            self.refresh_table(filtered_df)
-            self.refresh_table()
+            # Usunięcie duplikatów
+            filtered_df = filtered_df.drop_duplicates().reset_index(drop=True)
+
+            self.df = filtered_df  # Przypisujemy wynik do self.df
+
+        self.refresh_table()  # Odświeżamy tabelę TYLKO RAZ
 
     def open_add_record_dialog(self):
         dialog = AddRecordDialog(self)
@@ -242,8 +246,6 @@ class LibraryApp(QMainWindow):
             }
 
 
-            print(f"New Record Data: {new_record}")  # Zobaczymy, co jest wprowadzane
-
             # Sprawdzenie, czy wszystkie wymagane pola zostały wypełnione
             if any(value == "" for value in new_record.values()):
                 QMessageBox.warning(self, "Błąd", "Wszystkie pola muszą być wypełnione!")
@@ -256,27 +258,32 @@ class LibraryApp(QMainWindow):
             except ValueError:
                 new_record["Liczba stron"] = 0
 
-            print(f"Converted Record: {new_record}")  # Zobaczymy, jak wyglądają dane po konwersji
+            #print(f"Converted Record: {new_record}")  # Zobaczymy, jak wyglądają dane po konwersji
 
-            # Dodanie rekordu do DataFrame
-            #self.df = self.df.append(new_record, ignore_index=True)
 
             new_df = pd.DataFrame([new_record], columns=self.df.columns)  # Używamy dokładnie tych samych kolumn!
             self.df = pd.concat([self.df, new_df], ignore_index=True)
-            print(f"DataFrame after adding record:\n{self.df.tail()}")
+            #print(f"DataFrame after adding record:\n{self.df.tail()}")
 
             # Odświeżenie tabeli i zapisanie danych
             self.refresh_table()
             self.save_data()
 
+
     def delete_record(self):
-        selected_row = self.table.currentRow()
-        if selected_row != -1:
-            self.df = self.df.drop(selected_row)
+        selected_rows = sorted(set(index.row() for index in self.table.selectedIndexes()), reverse=True)
+
+        if not selected_rows:
+            return  # Nic nie zaznaczono
+
+        reply = QMessageBox.question(self, "Potwierdzenie", "Czy na pewno chcesz usunąć zaznaczone rekordy?",
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            self.df.drop(selected_rows, inplace=True)
+            self.df.reset_index(drop=True, inplace=True)
             self.refresh_table()
             self.save_data()
-        else:
-            QMessageBox.warning(self, "Brak zaznaczenia", "Proszę zaznaczyć rekord do usunięcia.")
 
 
 if __name__ == "__main__":
