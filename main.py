@@ -109,6 +109,7 @@ class LibraryApp(QMainWindow):
         # Podłączamy metodę do śledzenia edycji komórek
         self.table.cellChanged.connect(self.handle_cell_edit)
 
+        #print(self.df.columns)
         self.setStyleSheet("""
             QMainWindow {
                 background-color: #1f1f2e;
@@ -162,6 +163,8 @@ class LibraryApp(QMainWindow):
             self.file_path = file_path
             self.df = pd.read_csv(file_path, quotechar='"')
 
+            self.df.columns = self.df.columns.str.strip() #dodane
+
             if "Liczba stron" in self.df.columns:
                 self.df["Liczba stron"] = self.df["Liczba stron"].apply(lambda x: int(float(x)) if pd.notna(x) else x)
 
@@ -203,9 +206,7 @@ class LibraryApp(QMainWindow):
                 delete_button.clicked.connect(lambda _, r=row: self.delete_row(r))
                 self.table.setCellWidget(row, df_to_display.shape[1], delete_button)
 
-
     def save_data(self):
-        #self.df.to_csv(self.file_path, index=False)
         self.df.to_csv(self.file_path, index=False, quoting=csv.QUOTE_ALL)
 
     def search_data(self):
@@ -245,6 +246,7 @@ class LibraryApp(QMainWindow):
                 "IDMiejsca": dialog.place_input.text()
             }
 
+            # self.df = pd.concat([self.df, pd.DataFrame([new_record])], ignore_index=True) #dodane
 
             # Sprawdzenie, czy wszystkie wymagane pola zostały wypełnione
             if any(value == "" for value in new_record.values()):
@@ -258,17 +260,12 @@ class LibraryApp(QMainWindow):
             except ValueError:
                 new_record["Liczba stron"] = 0
 
-            #print(f"Converted Record: {new_record}")  # Zobaczymy, jak wyglądają dane po konwersji
-
-
             new_df = pd.DataFrame([new_record], columns=self.df.columns)  # Używamy dokładnie tych samych kolumn!
             self.df = pd.concat([self.df, new_df], ignore_index=True)
-            #print(f"DataFrame after adding record:\n{self.df.tail()}")
-
             # Odświeżenie tabeli i zapisanie danych
             self.refresh_table()
-            self.save_data()
 
+            self.save_data()
 
     def delete_record(self):
         selected_rows = sorted(set(index.row() for index in self.table.selectedIndexes()), reverse=True)
